@@ -22,6 +22,7 @@ struct Settings {
   String mqttPass;
   String mqttTopic;
   uint32_t intervalS = 10;
+  bool base64 = false;  // payload: false = raw JPEG bytes, true = the JPEG as base64 text
 
   bool valid() const {
     return wifiSsid.length() && mqttHost.length() && mqttTopic.length();

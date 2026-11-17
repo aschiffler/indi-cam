@@ -11,6 +11,8 @@ h1{font-size:1.5rem;margin:0}
 .sub{margin:0 0 1.2rem;color:#5d6878}
 .row{display:flex;gap:.8rem;flex-wrap:wrap}
 button{padding:.8rem 1.4rem;font:inherit;font-weight:600;color:#fff;background:#1463c4;border:0;border-radius:8px;cursor:pointer}
+button{display:inline-flex;align-items:center;gap:.5rem}
+button svg{width:1.25em;height:1.25em;flex:none}
 button.danger{background:#b3261e}
 button.plain{background:#fff;color:#1c2430;border:1px solid #b6bdc8}
 button:disabled{opacity:.5;cursor:default}
@@ -43,10 +45,22 @@ small{color:#5d6878}
 This browser supports neither USB serial ports nor Bluetooth. Use Chrome or Edge (PC or
 Android) and open the page via <code>https://</code> or <code>http://localhost</code>.</div>
 
+<svg hidden>
+<!-- serial (COM) port connector -->
+<symbol id="icoSerial" viewBox="0 0 24 24">
+<path d="M3.2 7.5h17.6a1 1 0 0 1 1 1.2l-1.5 6.6a1.6 1.6 0 0 1-1.6 1.2H5.3a1.6 1.6 0 0 1-1.6-1.2L2.2 8.7a1 1 0 0 1 1-1.2z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+<g fill="currentColor"><circle cx="7" cy="10.6" r="1"/><circle cx="9.5" cy="10.6" r="1"/><circle cx="12" cy="10.6" r="1"/><circle cx="14.5" cy="10.6" r="1"/><circle cx="17" cy="10.6" r="1"/>
+<circle cx="8.25" cy="13.6" r="1"/><circle cx="10.75" cy="13.6" r="1"/><circle cx="13.25" cy="13.6" r="1"/><circle cx="15.75" cy="13.6" r="1"/></g>
+</symbol>
+<symbol id="icoBluetooth" viewBox="0 0 24 24">
+<path d="M6.5 7.5l11 9-5.5 4.5V3l5.5 4.5-11 9" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+</symbol>
+</svg>
+
 <div class="row" id="menu">
-<button id="btnLog">Show log</button>
-<button id="btnCfg">Configure</button>
-<button id="btnFlash" class="danger">Flash / reset</button>
+<button id="btnLog" title="Uses the USB serial (COM) port"><svg aria-hidden="true"><use href="#icoSerial"/></svg>Show log</button>
+<button id="btnCfg" title="Uses Bluetooth"><svg aria-hidden="true"><use href="#icoBluetooth"/></svg>Configure</button>
+<button id="btnFlash" class="danger" title="Uses the USB serial (COM) port"><svg aria-hidden="true"><use href="#icoSerial"/></svg>Flash / reset</button>
 </div>
 
 <section id="cfgPage" hidden>
@@ -87,6 +101,8 @@ Android) and open the page via <code>https://</code> or <code>http://localhost</
 <label>Password<input type="password" id="f_pass" maxlength="100" autocomplete="new-password"></label>
 <label>Topic <small id="topicHint"></small><input type="text" id="f_topic" maxlength="200" required autocapitalize="off" spellcheck="false"></label>
 <label>Publish interval, seconds <small>(min. 5)</small><input type="number" id="f_interval" min="5" max="86400" required></label>
+<label id="g_b64">Payload<select id="f_b64"><option value="">JPEG file (binary)</option>
+<option value="1">JPEG as base64 text</option></select></label>
 </fieldset>
 <p class="row">
 <button type="submit" id="cfgSave">Save and restart</button>
@@ -404,6 +420,9 @@ function fillForm(cfg) {
   $('f_pass').placeholder = kept(cfg.hasPass);
   $('f_topic').value = cfg.topic;
   $('f_interval').value = cfg.interval;
+  // Firmware before v1.1 does not have this setting.
+  $('g_b64').hidden = cfg.b64 === undefined;
+  $('f_b64').value = cfg.b64 ? '1' : '';
   updateFormGroups();
 }
 
@@ -423,6 +442,7 @@ function readForm() {
     pass: $('f_pass').value,
     topic: $('f_topic').value,
     interval: Number($('f_interval').value),
+    ...($('g_b64').hidden ? {} : { b64: $('f_b64').value === '1' }),
   };
 }
 

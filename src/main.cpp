@@ -47,6 +47,7 @@ void loadSettings(Settings &s) {
   s.mqttPass = p.getString("mpass", "");
   s.mqttTopic = p.getString("topic", "");
   s.intervalS = max<uint32_t>(p.getUInt("interval", 10), MIN_INTERVAL_S);
+  s.base64 = p.getBool("b64", false);
   p.end();
 }
 
@@ -67,6 +68,7 @@ void saveSettings(const Settings &s) {
   p.putString("mpass", s.mqttPass);
   p.putString("topic", s.mqttTopic);
   p.putUInt("interval", s.intervalS);
+  p.putBool("b64", s.base64);
   p.end();
 }
 

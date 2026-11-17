@@ -19,7 +19,8 @@ It enters this mode when no configuration is stored, or when the last attempt to
 WiFi or to the MQTT broker failed. It stays there until you save a configuration or reset it.
 
 **Op mode (operation).** The device joins the configured WiFi, connects to the MQTT broker and
-publishes one 800x600 JPEG per interval. The MQTT payload is the raw JPEG file.
+publishes one 800x600 JPEG per interval. The MQTT payload is the raw JPEG file, or the
+file as base64 text if that is selected in the settings.
 
 The device appends its ID to the configured topic: with topic `vlab/cam`, the device
 `20b868` publishes to `vlab/cam/20b868`. Subscribe to `vlab/cam/+` to receive all devices.
@@ -49,6 +50,7 @@ The device falls back from op mode to init mode when:
 | User, Password | Optional. Leave both empty for a broker without login |
 | Topic | Base topic, no wildcards. Images are published to `<topic>/xxxxxx`, for example `vlab/cam/20b868` |
 | Publish interval | Seconds, minimum 5 |
+| Payload | "JPEG file (binary)" sends the image file itself. "JPEG as base64 text" sends the same file as text, about a third larger, for receivers that cannot handle binary messages (for example the n8n MQTT trigger) |
 
 Stored passwords are never shown on the page. Leave a password field empty to keep the
 stored value.

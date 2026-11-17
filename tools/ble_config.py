@@ -7,7 +7,7 @@
 
 device-id is the 6 characters from the device name (indi-cam-xxxxxx). It can be left
 out if only one device is in range. Keys for "set": ssid ent psk eapUser eapPass eapId
-host port tls ca user pass topic interval. Settings that are not given keep their value.
+host port tls ca user pass topic interval b64. Settings that are not given keep their value.
 
 Needs: python -m pip install bleak cryptography
 The protocol is described in src/ble.cpp.
@@ -87,7 +87,7 @@ async def request(client: BleakClient, payload: dict) -> dict:
 
 
 def parse_value(key, value):
-    if key in ("ent", "tls"):
+    if key in ("ent", "tls", "b64"):
         return value.lower() in ("1", "true", "yes", "on")
     if key in ("port", "interval"):
         return int(value)

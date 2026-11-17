@@ -156,6 +156,7 @@ static String handleRequest(JsonDocument &req) {
     c["hasPass"] = s.mqttPass.length() > 0;
     c["topic"] = s.mqttTopic;
     c["interval"] = s.intervalS;
+    c["b64"] = s.base64;
     String out;
     serializeJson(doc, out);
     return out;
@@ -181,6 +182,7 @@ static String handleRequest(JsonDocument &req) {
     if (*(v = c["pass"] | "")) n.mqttPass = v;
     long interval = c["interval"] | 0L;
     n.intervalS = interval < 0 ? 0 : (uint32_t)interval;
+    n.base64 = c["b64"] | cfg->base64;  // pages that do not know the setting leave it as it is
     n.mqttTopic = c["topic"] | "";
 
     bool newWifiSecret = *(c[n.enterprise ? "eapPass" : "psk"] | "");

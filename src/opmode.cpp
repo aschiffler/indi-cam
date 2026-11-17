@@ -4,6 +4,7 @@
 #include <PubSubClient.h>
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
+#include <mbedtls/base64.h>
 #include <driver/gpio.h>
 #include <esp_rom_gpio.h>
 #include <soc/gpio_sig_map.h>
@@ -182,6 +183,23 @@ static void captureAndPublish() {
     return;
   }
 
+  // Payload: the JPEG file itself, or the same file as base64 text for receivers that
+  // cannot handle binary messages.
+  const uint8_t *data = fb->buf;
+  size_t dataLen = fb->len;
+  uint8_t *encoded = nullptr;
+  if (cfg->base64) {
+    size_t capacity = (fb->len + 2) / 3 * 4 + 1;
+    encoded = (uint8_t *)ps_malloc(capacity);
+    if (!encoded || mbedtls_base64_encode(encoded, capacity, &dataLen, fb->buf, fb->len) != 0) {
+      Serial.println("[pub] ERROR: base64 encoding failed");
+      free(encoded);
+      esp_camera_fb_return(fb);
+      return;
+    }
+    data = encoded;
+  }
+
   uint32_t start = millis();
   // The PUBLISH packet (QoS 0) is written directly to the connection. PubSubClient cannot
   // send it: it keeps the packet length in 16 bits, so images above 64 KB go out with a
@@ -191,7 +209,7 @@ static void captureAndPublish() {
   uint8_t head[8 + topicLen];
   size_t h = 0;
   head[h++] = 0x30;  // PUBLISH, QoS 0, not retained
-  uint32_t remaining = 2 + topicLen + fb->len;
+  uint32_t remaining = 2 + topicLen + dataLen;
   do {
     uint8_t b = remaining % 128;
     remaining /= 128;
@@ -202,18 +220,19 @@ static void captureAndPublish() {
   memcpy(head + h, pubTopic.c_str(), topicLen);
   h += topicLen;
   bool ok = net.write(head, h) == h;
-  for (size_t off = 0; ok && off < fb->len;) {
-    size_t n = min<size_t>(PUBLISH_CHUNK, fb->len - off);
-    ok = net.write(fb->buf + off, n) == n;
+  for (size_t off = 0; ok && off < dataLen;) {
+    size_t n = min<size_t>(PUBLISH_CHUNK, dataLen - off);
+    ok = net.write(data + off, n) == n;
     off += n;
   }
+  free(encoded);
 
   if (ok) {
     bleStatus("running", String("Image ") + (frameCount + 1) + ", " + (fb->len / 1024) + " KB, WiFi " +
                              WiFi.RSSI() + " dBm");
-    Serial.printf("[pub] #%u: %ux%u JPEG, %u bytes -> %s (%u ms, RSSI %d dBm)\n", ++frameCount,
-                  fb->width, fb->height, fb->len, pubTopic.c_str(), millis() - start,
-                  WiFi.RSSI());
+    Serial.printf("[pub] #%u: %ux%u JPEG, %u bytes%s -> %s (%u ms, RSSI %d dBm)\n", ++frameCount,
+                  fb->width, fb->height, fb->len, cfg->base64 ? " as base64" : "",
+                  pubTopic.c_str(), millis() - start, WiFi.RSSI());
   } else {
     Serial.printf("[pub] ERROR: publishing %u bytes failed, reconnecting\n", fb->len);
     mqtt.disconnect();  // a half-written packet would corrupt the stream

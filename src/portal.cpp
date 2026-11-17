@@ -162,7 +162,11 @@ static void sendPage(const String &error) {
   h += F("<label>Publish interval, seconds <small>(min. " STR(MIN_INTERVAL_S) ")</small>"
          "<input type=\"number\" name=\"interval\" min=\"" STR(MIN_INTERVAL_S) "\" max=\"86400\" required value=\"");
   h += s.intervalS;
-  h += F("\"></label></fieldset><button type=\"submit\">Save and reboot</button></form>");
+  h += F("\"></label><label>Payload<select name=\"payload\"><option value=\"raw\">JPEG file (binary)"
+         "</option><option value=\"b64\"");
+  if (s.base64) h += F(" selected");
+  h += F(">JPEG as base64 text</option></select></label></fieldset>"
+         "<button type=\"submit\">Save and reboot</button></form>");
   h += FPSTR(PAGE_SCRIPT);
   h += F("</main></body></html>");
   server.send(error.length() ? 400 : 200, "text/html", h);
@@ -195,6 +199,7 @@ static void handleSave() {
   long interval = server.arg("interval").toInt();
   n.mqttPort = (port < 1 || port > 65535) ? 0 : (uint16_t)port;
   n.intervalS = interval < 0 ? 0 : (uint32_t)interval;
+  n.base64 = server.arg("payload") == "b64";
 
   bool newWifiSecret = server.arg(n.enterprise ? "eappass" : "psk").length();
   bool newMqttPass = server.arg("mpass").length();
