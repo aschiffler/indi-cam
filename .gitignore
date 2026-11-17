@@ -1,0 +1,8 @@
+.pio/
+.vscode/
+__pycache__/
+# Built by tools/build_webflasher.py (in CI: published to GitHub Pages and releases)
+webflasher/firmware.bin
+webflasher/version.json
+# Dumps of live cluster objects
+k8s/backup/

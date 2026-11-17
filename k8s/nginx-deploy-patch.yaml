@@ -1,0 +1,15 @@
+# Adds the indi-cam web app files to the existing nginx deployment in namespace vlab.
+# Applied with: kubectl -n vlab patch deployment nginx --patch-file k8s/nginx-deploy-patch.yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: nginx
+          volumeMounts:
+            - mountPath: /usr/share/nginx/html/indi-cam
+              name: indi-cam-web
+              readOnly: true
+      volumes:
+        - name: indi-cam-web
+          configMap:
+            name: indi-cam-web

@@ -1,0 +1,59 @@
+# Builds the firmware. For a version tag (v1.2.3) it also creates a GitHub release with
+# the firmware image attached. Every run publishes the web page together with the image
+# to GitHub Pages, where the hosted page (thws.education/indi-cam) downloads it from.
+name: Release firmware
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: platformio-${{ hashFiles('platformio.ini') }}
+      - run: pip install platformio cryptography
+      - name: Test page protocol code
+        run: node tools/test_proto.mjs
+      - name: Build firmware image
+        run: python tools/build_webflasher.py
+        env:
+          FW_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || format('{0}-{1}', github.ref_name, github.sha) }}
+      - name: Create release
+        if: github.ref_type == 'tag'
+        run: |
+          cp webflasher/firmware.bin "indi-cam-${GITHUB_REF_NAME}.bin"
+          gh release create "$GITHUB_REF_NAME" "indi-cam-${GITHUB_REF_NAME}.bin" --generate-notes \
+            --notes "Complete image for flash offset 0x0 (ESP32-S3, 16 MB flash). Flashing it deletes the stored settings."
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: webflasher
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

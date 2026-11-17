@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>indi-cam - THWS Dr. Schiffler</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#f2f4f7;color:#1c2430;line-height:1.5}
+main{max-width:46rem;margin:0 auto;padding:1.5rem 1rem}
+h1{font-size:1.5rem;margin:0}
+.sub{margin:0 0 1.2rem;color:#5d6878}
+.row{display:flex;gap:.8rem;flex-wrap:wrap}
+button{padding:.8rem 1.4rem;font:inherit;font-weight:600;color:#fff;background:#1463c4;border:0;border-radius:8px;cursor:pointer}
+button.danger{background:#b3261e}
+button.plain{background:#fff;color:#1c2430;border:1px solid #b6bdc8}
+button:disabled{opacity:.5;cursor:default}
+section{background:#fff;border:1px solid #d5dae1;border-radius:8px;padding:1rem 1.2rem;margin-top:1rem}
+h2{font-size:1.05rem;margin:0 0 .5rem}
+pre{background:#10151c;color:#d6dde6;padding:.8rem;border-radius:6px;height:24rem;overflow:auto;margin:.6rem 0 0;font-size:.8rem;white-space:pre-wrap;word-break:break-all}
+progress{width:100%;height:1.2rem;margin-top:.6rem}
+code{background:#eef0f3;padding:.1rem .3rem;border-radius:4px}
+.msg{padding:.7rem 1rem;border-radius:8px;margin-top:.8rem}
+.err{background:#fde8e6;border:1px solid #e0988f}
+.ok{background:#e4f5e6;border:1px solid #8cc795}
+label{display:block;margin-top:.7rem;font-size:.9rem}
+label.cb{display:flex;align-items:center;gap:.5rem}
+input[type=text],input[type=password],input[type=number],select,textarea{width:100%;box-sizing:border-box;
+padding:.5rem;margin-top:.2rem;border:1px solid #b6bdc8;border-radius:6px;font:inherit}
+textarea{font-family:monospace;font-size:.75rem;height:6rem}
+fieldset{border:1px solid #d5dae1;border-radius:8px;margin:1rem 0 0;padding:.4rem 1rem 1rem}
+legend{font-weight:600;padding:0 .4rem}
+small{color:#5d6878}
+.info{background:#eef3fb;border:1px solid #b9cbe6}
+[hidden]{display:none !important}
+</style>
+</head>
+<body>
+<main>
+<h1>indi-cam</h1>
+<p class="sub">THWS Dr. Schiffler</p>
+
+<div id="unsupported" class="msg err" hidden>
+This browser supports neither USB serial ports nor Bluetooth. Use Chrome or Edge (PC or
+Android) and open the page via <code>https://</code> or <code>http://localhost</code>.</div>
+
+<div class="row" id="menu">
+<button id="btnLog">Show log</button>
+<button id="btnCfg">Configure</button>
+<button id="btnFlash" class="danger">Flash / reset</button>
+</div>
+
+<section id="cfgPage" hidden>
+<h2>Configure via Bluetooth</h2>
+<div id="cfgConnect">
+<label>Setup code<input type="password" id="cfgCode" autocomplete="off"></label>
+<p class="row">
+<button id="cfgStart">Select device</button>
+<button id="cfgClose" class="plain">Close</button>
+</p>
+</div>
+<div id="cfgStatus" class="msg info" hidden></div>
+<div id="cfgError" class="msg err" hidden></div>
+<form id="cfgForm" hidden>
+<fieldset><legend>WiFi</legend>
+<label>SSID<input type="text" id="f_ssid" maxlength="32" required autocapitalize="off" spellcheck="false"></label>
+<label>Security<select id="f_ent"><option value="">WPA2-PSK</option>
+<option value="1">WPA2-Enterprise (PEAP / TTLS)</option></select></label>
+<div id="g_psk">
+<label>Password (PSK)<input type="password" id="f_psk" maxlength="63" autocomplete="new-password"></label>
+</div>
+<div id="g_ent">
+<label>Username<input type="text" id="f_eapUser" maxlength="100" autocapitalize="off" spellcheck="false"></label>
+<label>Password<input type="password" id="f_eapPass" maxlength="100" autocomplete="new-password"></label>
+<label>Anonymous identity <small>(optional, defaults to username)</small>
+<input type="text" id="f_eapId" maxlength="100" autocapitalize="off" spellcheck="false"></label>
+</div>
+</fieldset>
+<fieldset><legend>MQTT</legend>
+<label>Broker host / IP<input type="text" id="f_host" maxlength="100" required autocapitalize="off" spellcheck="false"></label>
+<label>Port<input type="number" id="f_port" min="1" max="65535" required></label>
+<label class="cb"><input type="checkbox" id="f_tls">Use TLS</label>
+<div id="g_ca">
+<label>CA certificate, PEM <small>(optional - if empty, the broker certificate is not verified)</small>
+<textarea id="f_ca" maxlength="3800" spellcheck="false"></textarea></label>
+</div>
+<label>User <small>(optional)</small><input type="text" id="f_user" maxlength="100" autocapitalize="off" spellcheck="false"></label>
+<label>Password<input type="password" id="f_pass" maxlength="100" autocomplete="new-password"></label>
+<label>Topic <small id="topicHint"></small><input type="text" id="f_topic" maxlength="200" required autocapitalize="off" spellcheck="false"></label>
+<label>Publish interval, seconds <small>(min. 5)</small><input type="number" id="f_interval" min="5" max="86400" required></label>
+</fieldset>
+<p class="row">
+<button type="submit" id="cfgSave">Save and restart</button>
+<button type="button" id="cfgDisconnect" class="plain">Disconnect</button>
+</p>
+</form>
+</section>
+
+<section id="logPage" hidden>
+<h2>Device log</h2>
+<div class="row">
+<button id="logStop" class="plain">Stop</button>
+<button id="logClear" class="plain">Clear</button>
+</div>
+<pre id="logOut"></pre>
+<p>Press <b>RST</b> on the board to see the start-up messages.</p>
+</section>
+
+<section id="flashPage" hidden>
+<h2>Flash / reset</h2>
+<p>Installs the firmware and deletes all stored settings, including passwords.
+The device then starts in setup mode.</p>
+<p id="flashVersion"><small></small></p>
+<div class="row">
+<button id="flashStart" class="danger">Select device and start</button>
+<button id="flashCancel" class="plain">Cancel</button>
+</div>
+<progress id="flashProgress" value="0" max="1" hidden></progress>
+<p id="flashStatus"></p>
+<div id="flashDone" class="msg ok" hidden>
+Done. Join the WiFi <code>indi-cam-setup-xxxxxx</code> (password <code>indicam-setup</code>)
+and open <code>http://192.168.4.1/</code>. If the WiFi does not appear, press <b>RST</b> on
+the board.</div>
+<div id="flashError" class="msg err" hidden></div>
+</section>
+</main>
+
+<script type="module">
+import { UUID, openSession, toFrames, FrameCollector } from './proto.js';
+
+const $ = id => document.getElementById(id);
+const USB_FILTER = [{ usbVendorId: 0x303a }];  // Espressif native USB
+
+// Log and flashing need a USB cable to the device, so they are offered on desktop only.
+// (Chrome on Android also has a serial API, but a phone is not connected by USB here.)
+const isMobile = navigator.userAgentData ? navigator.userAgentData.mobile
+  : /Android|iPhone|iPad/i.test(navigator.userAgent);
+const hasSerial = 'serial' in navigator && !isMobile;
+const hasBluetooth = 'bluetooth' in navigator;  // configuration: also Chrome on Android
+$('btnLog').hidden = $('btnFlash').hidden = !hasSerial;
+$('btnCfg').hidden = !hasBluetooth;
+$('unsupported').hidden = hasSerial || hasBluetooth;
+// Where the page is hosted without the firmware image, flashing is not offered.
+// The firmware image is taken from next to this page if it is there (local copy, GitHub
+// Pages), else from GitHub Pages, where the release workflow publishes it.
+const FIRMWARE_SOURCES = ['./', 'https://aschiffler.github.io/indi-cam/'];
+let firmwareBase = null;
+(async () => {
+  for (const base of FIRMWARE_SOURCES) {
+    try {
+      const r = await fetch(base + 'firmware.bin', { method: 'HEAD', cache: 'no-store' });
+      if (!r.ok) continue;
+      firmwareBase = base;
+      const v = await (await fetch(base + 'version.json', { cache: 'no-store' })).json();
+      $('flashVersion').textContent = 'Firmware: ' + v.version + ' (' + v.built + ')';
+      break;
+    } catch (e) {}
+  }
+  if (!firmwareBase) $('btnFlash').hidden = true;
+})();
+
+function show(page) {
+  $('logPage').hidden = page !== 'log';
+  $('flashPage').hidden = page !== 'flash';
+  $('cfgPage').hidden = page !== 'cfg';
+  $('btnLog').disabled = $('btnFlash').disabled = $('btnCfg').disabled = page !== null;
+}
+
+// ---------- Show log ----------
+let logPort = null, logReader = null;
+
+async function stopLog() {
+  const reader = logReader;
+  logPort = logReader = null;  // ends the read loop, which then closes the port
+  try { if (reader) await reader.cancel(); } catch (e) {}
+}
+
+$('btnLog').onclick = async () => {
+  let port;
+  try {
+    port = await navigator.serial.requestPort({ filters: USB_FILTER });
+  } catch (e) {
+    return;  // port dialog cancelled
+  }
+  show('log');
+  const out = $('logOut');
+  const print = text => {
+    const atEnd = out.scrollTop + out.clientHeight >= out.scrollHeight - 30;
+    out.textContent += text;
+    if (out.textContent.length > 200000) out.textContent = out.textContent.slice(-150000);
+    if (atEnd) out.scrollTop = out.scrollHeight;
+  };
+  logPort = port;
+  const decoder = new TextDecoder();
+  // The port disappears for a moment when the board restarts, so keep reopening it.
+  while (logPort === port) {
+    try {
+      await port.open({ baudRate: 115200 });
+      while (logPort === port && port.readable) {
+        logReader = port.readable.getReader();
+        try {
+          for (;;) {
+            const { value, done } = await logReader.read();
+            if (done) break;
+            print(decoder.decode(value, { stream: true }));
+          }
+        } finally {
+          logReader.releaseLock();
+        }
+      }
+    } catch (e) {
+      if (logPort === port) print('\n[page] ' + e.message + ' - retrying\n');
+    }
+    try { await port.close(); } catch (e) {}
+    if (logPort === port) await new Promise(r => setTimeout(r, 1000));
+  }
+};
+
+$('logStop').onclick = async () => { await stopLog(); show(null); };
+$('logClear').onclick = () => { $('logOut').textContent = ''; };
+
+// ---------- Flash / reset ----------
+$('btnFlash').onclick = () => {
+  $('flashProgress').hidden = $('flashDone').hidden = $('flashError').hidden = true;
+  $('flashStatus').textContent = '';
+  $('flashStart').disabled = $('flashCancel').disabled = false;
+  $('flashCancel').textContent = 'Cancel';
+  show('flash');
+};
+$('flashCancel').onclick = () => show(null);
+
+$('flashStart').onclick = async () => {
+  const status = text => { $('flashStatus').textContent = text; };
+  let port, transport;
+  try {
+    port = await navigator.serial.requestPort({ filters: USB_FILTER });
+  } catch (e) {
+    return;  // port dialog cancelled
+  }
+  $('flashStart').disabled = $('flashCancel').disabled = true;
+  $('flashDone').hidden = $('flashError').hidden = true;
+  try {
+    status('Loading firmware ...');
+    const response = await fetch(firmwareBase + 'firmware.bin', { cache: 'no-store' });
+    if (!response.ok) throw new Error('The firmware image could not be loaded');
+    const firmware = new Uint8Array(await response.arrayBuffer());
+
+    const { ESPLoader, Transport } = await import('https://unpkg.com/esptool-js@0.7.1/bundle.js');
+    status('Connecting ...');
+    transport = new Transport(port, false);
+    const loader = new ESPLoader({
+      transport,
+      baudrate: 460800,
+      romBaudrate: 115200,
+      terminal: { clean() {}, writeLine: t => console.log(t), write: t => console.log(t) },
+    });
+    const chip = await loader.main();
+    if (!/ESP32-S3/i.test(chip)) throw new Error('Wrong device: ' + chip + '. An ESP32-S3 is expected.');
+
+    // The image covers the settings area with empty data, so writing it also deletes
+    // the stored configuration.
+    $('flashProgress').hidden = false;
+    await loader.writeFlash({
+      fileArray: [{ data: firmware, address: 0 }],
+      flashMode: 'keep',
+      flashFreq: 'keep',
+      flashSize: 'keep',
+      eraseAll: false,
+      compress: true,
+      reportProgress: (index, written, total) => {
+        $('flashProgress').value = written / total;
+        status('Writing ' + Math.round(100 * written / total) + ' %');
+      },
+    });
+    status('Restarting device ...');
+    await loader.after('hard_reset');
+    status('');
+    $('flashProgress').hidden = true;
+    $('flashDone').hidden = false;
+  } catch (e) {
+    console.error(e);
+    status('');
+    $('flashProgress').hidden = true;
+    $('flashError').textContent = 'Failed: ' + (e.message || e) +
+      '. Close other programs using the port. If it still fails, hold BOOT, press and release RST, release BOOT, and try again.';
+    $('flashError').hidden = false;
+    $('flashStart').disabled = false;
+  } finally {
+    try { if (transport) await transport.disconnect(); } catch (e) {}
+    $('flashCancel').disabled = false;
+    $('flashCancel').textContent = 'Close';
+  }
+};
+
+// ---------- Configure via Bluetooth ----------
+// The protocol is in proto.js; the device side is src/ble.cpp.
+const FRAME_SIZE = 180;
+const STATE_TEXT = {
+  starting: 'Starting',
+  wifi_connecting: 'Connecting to WiFi',
+  wifi_ok: 'WiFi connected',
+  mqtt_connecting: 'Connecting to broker',
+  running: 'Running',
+  setup: 'Setup mode',
+  failed: 'Failed',
+  saved: 'Saved',
+};
+let ble = null;         // connection to the selected device
+let bleWanted = false;  // reconnect when the device restarts
+
+function cfgStatus(text, kind) {
+  const box = $('cfgStatus');
+  box.textContent = text;
+  box.className = 'msg ' + (kind || 'info');
+  box.hidden = false;
+}
+
+function cfgError(text) {
+  $('cfgError').textContent = text;
+  $('cfgError').hidden = !text;
+}
+
+function bytes(view) {
+  return new Uint8Array(view.buffer, view.byteOffset, view.byteLength);
+}
+
+function showDeviceStatus(view) {
+  let st;
+  try {
+    st = JSON.parse(new TextDecoder().decode(view));
+  } catch (e) {
+    return;
+  }
+  const bad = st.state === 'failed' || (st.state === 'setup' && /failed/.test(st.detail));
+  const kind = bad ? 'err' : st.state === 'running' ? 'ok' : 'info';
+  cfgStatus('Device ' + st.id + ' - ' + (STATE_TEXT[st.state] || st.state) +
+    (st.detail ? ': ' + st.detail : ''), kind);
+  $('topicHint').textContent = '(images are published to <topic>/' + st.id + ')';
+}
+
+async function bleConnect(device) {
+  const gatt = await device.gatt.connect();
+  const service = await gatt.getPrimaryService(UUID.service);
+  const conn = {
+    device,
+    key: await service.getCharacteristic(UUID.key),
+    rx: await service.getCharacteristic(UUID.rx),
+    tx: await service.getCharacteristic(UUID.tx),
+    status: await service.getCharacteristic(UUID.status),
+    collector: new FrameCollector(),
+    onMessage: null,
+  };
+  conn.tx.addEventListener('characteristicvaluechanged', e => {
+    const message = conn.collector.push(bytes(e.target.value));
+    if (message && conn.onMessage) conn.onMessage(message);
+  });
+  await conn.tx.startNotifications();
+  conn.status.addEventListener('characteristicvaluechanged', e => showDeviceStatus(e.target.value));
+  await conn.status.startNotifications();
+  showDeviceStatus(await conn.status.readValue());
+  ble = conn;
+}
+
+async function bleRequest(payload) {
+  const conn = ble;
+  const session = await openSession(bytes(await conn.key.readValue()));
+  const answer = new Promise((resolve, reject) => {
+    conn.onMessage = resolve;
+    setTimeout(() => reject(new Error('No answer from the device')), 15000);
+  });
+  for (const frame of toFrames(await session.seal(payload), FRAME_SIZE))
+    await conn.rx.writeValueWithResponse(frame);
+  const reply = await session.open(await answer);
+  if (!reply.ok) throw new Error(reply.err || 'Request failed');
+  return reply;
+}
+
+function updateFormGroups() {
+  const ent = $('f_ent').value === '1';
+  $('g_psk').hidden = ent;
+  $('g_ent').hidden = !ent;
+  $('g_ca').hidden = !$('f_tls').checked;
+}
+$('f_ent').onchange = updateFormGroups;
+$('f_tls').onchange = () => {
+  if ($('f_tls').checked && $('f_port').value === '1883') $('f_port').value = '8883';
+  if (!$('f_tls').checked && $('f_port').value === '8883') $('f_port').value = '1883';
+  updateFormGroups();
+};
+
+function fillForm(cfg) {
+  const kept = stored => stored ? '(stored - leave empty to keep)' : '';
+  $('f_ssid').value = cfg.ssid;
+  $('f_ent').value = cfg.ent ? '1' : '';
+  $('f_psk').value = $('f_eapPass').value = $('f_pass').value = '';
+  $('f_psk').placeholder = kept(cfg.hasPsk);
+  $('f_eapUser').value = cfg.eapUser;
+  $('f_eapPass').placeholder = kept(cfg.hasEapPass);
+  $('f_eapId').value = cfg.eapId;
+  $('f_host').value = cfg.host;
+  $('f_port').value = cfg.port;
+  $('f_tls').checked = cfg.tls;
+  $('f_ca').value = cfg.ca;
+  $('f_user').value = cfg.user;
+  $('f_pass').placeholder = kept(cfg.hasPass);
+  $('f_topic').value = cfg.topic;
+  $('f_interval').value = cfg.interval;
+  updateFormGroups();
+}
+
+function readForm() {
+  return {
+    ssid: $('f_ssid').value,
+    ent: $('f_ent').value === '1',
+    psk: $('f_psk').value,
+    eapUser: $('f_eapUser').value,
+    eapPass: $('f_eapPass').value,
+    eapId: $('f_eapId').value,
+    host: $('f_host').value,
+    port: Number($('f_port').value),
+    tls: $('f_tls').checked,
+    ca: $('f_ca').value,
+    user: $('f_user').value,
+    pass: $('f_pass').value,
+    topic: $('f_topic').value,
+    interval: Number($('f_interval').value),
+  };
+}
+
+async function loadSettings() {
+  const reply = await bleRequest({ code: $('cfgCode').value, cmd: 'get' });
+  fillForm(reply.cfg);
+  $('cfgForm').hidden = false;
+  $('cfgConnect').hidden = true;
+}
+
+// The device restarts after saving. Reconnect so the status keeps updating.
+async function reconnect(device) {
+  ble = null;
+  if (!bleWanted) return;
+  cfgStatus('Device is restarting ...');
+  for (let i = 0; i < 30 && bleWanted && !ble; i++) {
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      await bleConnect(device);
+    } catch (e) {}
+  }
+  if (bleWanted && !ble) cfgStatus('Connection to the device lost.', 'err');
+}
+
+function cfgReset() {
+  bleWanted = false;
+  if (ble && ble.device.gatt.connected) ble.device.gatt.disconnect();
+  ble = null;
+  $('cfgForm').hidden = $('cfgStatus').hidden = true;
+  $('cfgConnect').hidden = false;
+  $('cfgStart').disabled = false;
+  cfgError('');
+}
+
+$('btnCfg').onclick = () => {
+  cfgReset();
+  show('cfg');
+};
+$('cfgClose').onclick = () => {
+  cfgReset();
+  show(null);
+};
+$('cfgDisconnect').onclick = cfgReset;
+
+$('cfgStart').onclick = async () => {
+  cfgError('');
+  if (!$('cfgCode').value) return cfgError('Enter the setup code first.');
+  let device;
+  try {
+    device = await navigator.bluetooth.requestDevice({ filters: [{ services: [UUID.service] }] });
+  } catch (e) {
+    return;  // device dialog cancelled
+  }
+  $('cfgStart').disabled = true;
+  try {
+    cfgStatus('Connecting ...');
+    await bleConnect(device);
+    device.addEventListener('gattserverdisconnected', () => reconnect(device));
+    bleWanted = true;
+    await loadSettings();
+  } catch (e) {
+    console.error(e);
+    cfgReset();
+    cfgError('Failed: ' + (e.message || e));
+  }
+};
+
+$('cfgForm').onsubmit = async event => {
+  event.preventDefault();
+  cfgError('');
+  $('cfgSave').disabled = true;
+  try {
+    if (!ble) throw new Error('Not connected to the device');
+    await bleRequest({ code: $('cfgCode').value, cmd: 'set', cfg: readForm() });
+    $('f_psk').value = $('f_eapPass').value = $('f_pass').value = '';
+  } catch (e) {
+    console.error(e);
+    cfgError('Not saved: ' + (e.message || e));
+  }
+  $('cfgSave').disabled = false;
+};
+</script>
+</body>
+</html>
